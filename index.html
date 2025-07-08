@@ -337,6 +337,20 @@
             onValue(galleryRef, (snapshot) => {
                 const data = snapshot.val();
                 photos = data ? data : [];
+
+                
+        // If empty, initialize with defaults
+                if (photos.length === 0) {
+                    photos = [
+                        'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net%2Fth%2Fid%2FOIP.1kZ-xCeYDmfn13OJOxxxXgHaHa%3Fpid%3DApi&f=1&ipt=702144901e207e7486991c445f63bff8ac7808da4e36b7555c6237b86263add3&ipo=images',
+                        
+                    ];
+                    set(galleryRef, photos);
+                }
+                
+                initGallery();
+            });
+        }
         
         // Gallery functions
         function initGallery() {
