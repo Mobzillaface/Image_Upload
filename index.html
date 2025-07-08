@@ -312,38 +312,90 @@
     let photos = [];
     let currentIndex = 0;
 
-    // DOM elements
-    const elements = {
-        mainPhoto: document.getElementById('mainPhoto'),
-        leftThumbnails: document.getElementById('leftThumbnails'),
-        rightThumbnails: document.getElementById('rightThumbnails'),
-        photoCounter: document.getElementById('photoCounter'),
-        prevBtn: document.getElementById('prevBtn'),
-        nextBtn: document.getElementById('nextBtn'),
-        uploadBtn: document.getElementById('uploadBtn'),
-        fileInput: document.getElementById('fileInput'),
-        uploadStatus: document.getElementById('uploadStatus')
-    };
+    // Initialize DOM elements after page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        const elements = {
+            mainPhoto: document.getElementById('mainPhoto'),
+            leftThumbnails: document.getElementById('leftThumbnails'),
+            rightThumbnails: document.getElementById('rightThumbnails'),
+            photoCounter: document.getElementById('photoCounter'),
+            prevBtn: document.getElementById('prevBtn'),
+            nextBtn: document.getElementById('nextBtn'),
+            uploadBtn: document.getElementById('uploadBtn'),
+            fileInput: document.getElementById('fileInput'),
+            uploadStatus: document.getElementById('uploadStatus')
+        };
 
-    // Load photos from Firebase
-    function loadSharedPhotos() {
+        // Connect upload button event listener
+        elements.uploadBtn.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+
+        // Rest of your code...
+        elements.fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
+            elements.uploadBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                
+                const uploadResponse = await fetch(
+                    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+                    { method: 'POST', body: formData }
+                );
+                
+                const uploadData = await uploadResponse.json();
+                
+                if (uploadData.secure_url) {
+                    elements.uploadStatus.textContent = 'Updating gallery...';
+                    const updatedPhotos = [uploadData.secure_url, ...photos];
+                    await set(ref(database, 'galleryImages'), updatedPhotos);
+                    elements.uploadStatus.textContent = 'Upload complete!';
+                } else {
+                    throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                elements.uploadStatus.textContent = 'Error: ' + error.message;
+            } finally {
+                elements.fileInput.value = '';
+                elements.uploadBtn.disabled = false;
+            }
+        });
+
+        // Load initial photos
+        loadSharedPhotos(elements);
+    });
+
+    function loadSharedPhotos(elements) {
         const galleryRef = ref(database, 'galleryImages');
         
         onValue(galleryRef, (snapshot) => {
             const data = snapshot.val();
             photos = Array.isArray(data) ? data.filter(url => typeof url === 'string' && url.startsWith('http')) : [];
-            initGallery();
-        }, (error) => {
-            console.error("Firebase read failed:", error);
-            elements.uploadStatus.textContent = 'Connection error';
+            
+            if (photos.length === 0) {
+                elements.mainPhoto.src = '';
+                elements.mainPhoto.alt = 'No photos available';
+                elements.photoCounter.textContent = 'No photos available';
+                elements.leftThumbnails.innerHTML = '';
+                elements.rightThumbnails.innerHTML = '';
+                return;
+            }
+            
+            initGallery(elements);
         });
     }
 
-    // Gallery functions
-    function initGallery() {
-        updateMainPhoto();
-        updateThumbnails();
-        updateCounter();
+    function initGallery(elements) {
+        updateMainPhoto(elements);
+        updateThumbnails(elements);
+        updateCounter(elements);
     }
     
     function updateMainPhoto() {
