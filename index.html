@@ -289,15 +289,35 @@
         </div>
     </div>
     
-    <script>
-        // Cloudinary Configuration - USING YOUR CREDENTIALS
+<script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
+        
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1N4BRJsmO141tQB-w5slY21yHKhKCxok",
+            authDomain: "imagegallery-d98e8.firebaseapp.com",
+            databaseURL: "https://imagegallery-d98e8-default-rtdb.firebaseio.com",
+            projectId: "imagegallery-d98e8",
+            storageBucket: "imagegallery-d98e8.firebasestorage.app",
+            messagingSenderId: "63599210314",
+            appId: "1:63599210314:web:a8a24d996eecb998a7dbb3",
+            measurementId: "G-V5NRKS81V1"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Cloudinary Configuration
         const CLOUDINARY_CLOUD_NAME = 'dadjewcmh';
         const CLOUDINARY_UPLOAD_PRESET = 'Test1234';
         
-        // Initialize with some default images or load from localStorage
-        let photos = JSON.parse(localStorage.getItem('galleryPhotos') || '[]');
-
+        let photos = [];
         let currentIndex = 0;
+
+        // DOM elements
         const elements = {
             mainPhoto: document.getElementById('mainPhoto'),
             leftThumbnails: document.getElementById('leftThumbnails'),
@@ -309,7 +329,29 @@
             fileInput: document.getElementById('fileInput'),
             uploadStatus: document.getElementById('uploadStatus')
         };
-        
+
+        // Load photos from Firebase
+        function loadSharedPhotos() {
+            const galleryRef = ref(database, 'galleryImages');
+            
+            onValue(galleryRef, (snapshot) => {
+                const data = snapshot.val();
+                photos = data ? data : [];
+                
+                // If empty, initialize with defaults
+                if (photos.length === 0) {
+                    photos = [
+                        'https://res.cloudinary.com/dadjewcmh/image/upload/v1620000000/sample.jpg',
+                        'https://res.cloudinary.com/dadjewcmh/image/upload/v1620000001/sample2.jpg'
+                    ];
+                    set(galleryRef, photos);
+                }
+                
+                initGallery();
+            });
+        }
+
+        // Gallery functions
         function initGallery() {
             updateMainPhoto();
             updateThumbnails();
@@ -319,7 +361,7 @@
         function updateMainPhoto() {
             if (photos.length === 0) {
                 elements.mainPhoto.src = '';
-                elements.mainPhoto.alt = 'No photos, upload something!';
+                elements.mainPhoto.alt = 'No photos available';
                 return;
             }
             elements.mainPhoto.src = photos[currentIndex];
@@ -363,12 +405,12 @@
         
         function updateCounter() {
             if (photos.length === 0) {
-                elements.photoCounter.textContent = 'No photos, upload something!';
+                elements.photoCounter.textContent = 'No photos available';
                 return;
             }
             elements.photoCounter.textContent = `Photo ${currentIndex + 1} of ${photos.length}`;
         }
-        
+
         // Upload functionality
         elements.uploadBtn.addEventListener('click', () => {
             elements.fileInput.click();
@@ -378,52 +420,61 @@
             const file = e.target.files[0];
             if (!file) return;
             
-            elements.uploadStatus.textContent = 'Uploading...';
+            elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
+            elements.uploadBtn.disabled = true;
             
             try {
+                // 1. Upload to Cloudinary
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                 
-                const response = await fetch(
+                const uploadResponse = await fetch(
                     `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
                     { method: 'POST', body: formData }
                 );
                 
-                const data = await response.json();
+                const uploadData = await uploadResponse.json();
                 
-                if (data.secure_url) {
-                    photos.unshift(data.secure_url);
-                    currentIndex = 0;
-                    localStorage.setItem('galleryPhotos', JSON.stringify(photos));
-                    initGallery();
-                    elements.uploadStatus.textContent = 'Upload successful!';
+                if (uploadData.secure_url) {
+                    // 2. Update Firebase
+                    elements.uploadStatus.textContent = 'Updating gallery...';
+                    
+                    // Add new image to beginning of array
+                    const updatedPhotos = [uploadData.secure_url, ...photos];
+                    await set(ref(database, 'galleryImages'), updatedPhotos);
+                    
+                    elements.uploadStatus.textContent = 'Upload complete!';
                 } else {
-                    throw new Error(data.error?.message || 'Upload failed');
+                    throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
                 }
             } catch (error) {
                 elements.uploadStatus.textContent = 'Error: ' + error.message;
                 console.error('Upload error:', error);
             } finally {
                 elements.fileInput.value = '';
+                elements.uploadBtn.disabled = false;
             }
         });
         
         // Navigation controls
-        elements.prevBtn.addEventListener('click', () => navigate(-1));
-        elements.nextBtn.addEventListener('click', () => navigate(1));
-        
-        function navigate(offset) {
+        elements.prevBtn.addEventListener('click', () => {
             if (photos.length === 0) return;
-            currentIndex = getCircularIndex(currentIndex + offset);
+            currentIndex = getCircularIndex(currentIndex - 1);
             initGallery();
-        }
+        });
+        
+        elements.nextBtn.addEventListener('click', () => {
+            if (photos.length === 0) return;
+            currentIndex = getCircularIndex(currentIndex + 1);
+            initGallery();
+        });
         
         // Keyboard and touch controls
         document.addEventListener('keydown', (e) => {
             if (photos.length === 0) return;
-            if (e.key === 'ArrowLeft') navigate(-1);
-            if (e.key === 'ArrowRight') navigate(1);
+            if (e.key === 'ArrowLeft') elements.prevBtn.click();
+            if (e.key === 'ArrowRight') elements.nextBtn.click();
         });
         
         let touchStartX = 0;
@@ -433,12 +484,12 @@
         
         document.addEventListener('touchend', (e) => {
             const touchEndX = e.changedTouches[0].screenX;
-            if (touchEndX < touchStartX - 50) navigate(1);  // Swipe left
-            if (touchEndX > touchStartX + 50) navigate(-1); // Swipe right
+            if (touchEndX < touchStartX - 50) elements.nextBtn.click();  // Swipe left
+            if (touchEndX > touchStartX + 50) elements.prevBtn.click(); // Swipe right
         });
         
-        // Initialize the gallery
-        initGallery();
+        // Initial load
+        loadSharedPhotos();
     </script>
 </body>
 </html>
