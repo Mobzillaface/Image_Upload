@@ -311,10 +311,11 @@
     
     let photos = [];
     let currentIndex = 0;
+    let elements;
 
-    // Initialize DOM elements after page loads
     document.addEventListener('DOMContentLoaded', () => {
-        const elements = {
+        // Initialize DOM elements
+        elements = {
             mainPhoto: document.getElementById('mainPhoto'),
             leftThumbnails: document.getElementById('leftThumbnails'),
             rightThumbnails: document.getElementById('rightThumbnails'),
@@ -326,107 +327,123 @@
             uploadStatus: document.getElementById('uploadStatus')
         };
 
-        // Connect upload button event listener
-        elements.uploadBtn.addEventListener('click', () => {
-            elements.fileInput.click();
-        });
-
-        // Rest of your code...
-        elements.fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
-            elements.uploadBtn.disabled = true;
-            
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                
-                const uploadResponse = await fetch(
-                    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-                    { method: 'POST', body: formData }
-                );
-                
-                const uploadData = await uploadResponse.json();
-                
-                if (uploadData.secure_url) {
-                    elements.uploadStatus.textContent = 'Updating gallery...';
-                    const updatedPhotos = [uploadData.secure_url, ...photos];
-                    await set(ref(database, 'galleryImages'), updatedPhotos);
-                    elements.uploadStatus.textContent = 'Upload complete!';
-                } else {
-                    throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                elements.uploadStatus.textContent = 'Error: ' + error.message;
-            } finally {
-                elements.fileInput.value = '';
-                elements.uploadBtn.disabled = false;
-            }
-        });
-
+        // Set up event listeners
+        setupEventListeners();
+        
         // Load initial photos
-        loadSharedPhotos(elements);
+        loadSharedPhotos();
     });
 
-    function loadSharedPhotos(elements) {
+    function setupEventListeners() {
+        elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
+        
+        elements.fileInput.addEventListener('change', handleFileUpload);
+        
+        elements.prevBtn.addEventListener('click', () => {
+            if (photos.length === 0) return;
+            currentIndex = (currentIndex - 1 + photos.length) % photos.length;
+            updateGallery();
+        });
+        
+        elements.nextBtn.addEventListener('click', () => {
+            if (photos.length === 0) return;
+            currentIndex = (currentIndex + 1) % photos.length;
+            updateGallery();
+        });
+    }
+
+    function loadSharedPhotos() {
         const galleryRef = ref(database, 'galleryImages');
         
         onValue(galleryRef, (snapshot) => {
             const data = snapshot.val();
             photos = Array.isArray(data) ? data.filter(url => typeof url === 'string' && url.startsWith('http')) : [];
             
-            if (photos.length === 0) {
-                elements.mainPhoto.src = '';
-                elements.mainPhoto.alt = 'No photos available';
-                elements.photoCounter.textContent = 'No photos available';
-                elements.leftThumbnails.innerHTML = '';
-                elements.rightThumbnails.innerHTML = '';
-                return;
+            if (photos.length > 0) {
+                currentIndex = 0; // Reset to first photo when new ones are added
             }
             
-            initGallery(elements);
+            updateGallery();
+        }, (error) => {
+            console.error("Firebase read failed:", error);
+            elements.uploadStatus.textContent = 'Error loading gallery';
         });
     }
 
-    function initGallery(elements) {
-        updateMainPhoto(elements);
-        updateThumbnails(elements);
-        updateCounter(elements);
+    async function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
+        elements.uploadBtn.disabled = true;
+        
+        try {
+            // Upload to Cloudinary
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            
+            const uploadResponse = await fetch(
+                `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+                { method: 'POST', body: formData }
+            );
+            
+            const uploadData = await uploadResponse.json();
+            
+            if (uploadData.secure_url) {
+                // Update Firebase
+                elements.uploadStatus.textContent = 'Updating gallery...';
+                const updatedPhotos = [uploadData.secure_url, ...photos];
+                await set(ref(database, 'galleryImages'), updatedPhotos);
+                
+                // No need to manually update photos array here - 
+                // the onValue listener will handle it automatically
+            } else {
+                throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            elements.uploadStatus.textContent = 'Error: ' + error.message;
+        } finally {
+            elements.fileInput.value = '';
+            elements.uploadBtn.disabled = false;
+        }
     }
-    
-    function updateMainPhoto() {
+
+    function updateGallery() {
         if (photos.length === 0) {
             elements.mainPhoto.src = '';
             elements.mainPhoto.alt = 'No photos available';
+            elements.photoCounter.textContent = 'No photos available';
+            elements.leftThumbnails.innerHTML = '';
+            elements.rightThumbnails.innerHTML = '';
             return;
         }
+        
+        // Update main photo
         elements.mainPhoto.src = photos[currentIndex];
         elements.mainPhoto.alt = `Photo ${currentIndex + 1}`;
+        
+        // Update counter
+        elements.photoCounter.textContent = `Photo ${currentIndex + 1} of ${photos.length}`;
+        
+        // Update thumbnails
+        updateThumbnails();
     }
-    
-    function getCircularIndex(index) {
-        return (index + photos.length) % photos.length;
-    }
-    
+
     function updateThumbnails() {
         elements.leftThumbnails.innerHTML = '';
         elements.rightThumbnails.innerHTML = '';
         
-        if (photos.length === 0) return;
-        
         // Left thumbnails (previous photos)
         for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
-            const index = getCircularIndex(currentIndex - i);
+            const index = (currentIndex - i + photos.length) % photos.length;
             createThumbnail(index, elements.leftThumbnails);
         }
         
         // Right thumbnails (next photos)
         for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
-            const index = getCircularIndex(currentIndex + i);
+            const index = (currentIndex + i) % photos.length;
             createThumbnail(index, elements.rightThumbnails);
         }
     }
@@ -438,7 +455,7 @@
         thumb.alt = `Photo ${index + 1}`;
         thumb.addEventListener('click', () => {
             currentIndex = index;
-            initGallery();
+            updateGallery();
         });
         container.appendChild(thumb);
     }
