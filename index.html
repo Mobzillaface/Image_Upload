@@ -337,20 +337,7 @@
             onValue(galleryRef, (snapshot) => {
                 const data = snapshot.val();
                 photos = data ? data : [];
-                
-                // If empty, initialize with defaults
-                if (photos.length === 0) {
-                    photos = [
-                        'https://res.cloudinary.com/dadjewcmh/image/upload/v1620000000/sample.jpg',
-                        'https://res.cloudinary.com/dadjewcmh/image/upload/v1620000001/sample2.jpg'
-                    ];
-                    set(galleryRef, photos);
-                }
-                
-                initGallery();
-            });
-        }
-
+        
         // Gallery functions
         function initGallery() {
             updateMainPhoto();
