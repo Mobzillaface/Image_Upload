@@ -290,207 +290,188 @@
     </div>
     
 <script type="module">
-        // Firebase imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
-        
-        // Your Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyD1N4BRJsmO141tQB-w5slY21yHKhKCxok",
-            authDomain: "imagegallery-d98e8.firebaseapp.com",
-            databaseURL: "https://imagegallery-d98e8-default-rtdb.firebaseio.com",
-            projectId: "imagegallery-d98e8",
-            storageBucket: "imagegallery-d98e8.firebasestorage.app",
-            messagingSenderId: "63599210314",
-            appId: "1:63599210314:web:a8a24d996eecb998a7dbb3",
-            measurementId: "G-V5NRKS81V1"
-        };
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyD1N4BRJsmO141tQB-w5slY21yHKhKCxok",
+        authDomain: "imagegallery-d98e8.firebaseapp.com",
+        databaseURL: "https://imagegallery-d98e8-default-rtdb.firebaseio.com",
+        projectId: "imagegallery-d98e8",
+        storageBucket: "imagegallery-d98e8.firebasestorage.app",
+        messagingSenderId: "63599210314",
+        appId: "1:63599210314:web:a8a24d996eecb998a7dbb3",
+        measurementId: "G-V5NRKS81V1"
+    };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const CLOUDINARY_CLOUD_NAME = 'dadjewcmh';
+    const CLOUDINARY_UPLOAD_PRESET = 'Test1234';
+    
+    let photos = [];
+    let currentIndex = 0;
 
-        // Cloudinary Configuration
-        const CLOUDINARY_CLOUD_NAME = 'dadjewcmh';
-        const CLOUDINARY_UPLOAD_PRESET = 'Test1234';
-        
-        let photos = [];
-        let currentIndex = 0;
+    // DOM elements
+    const elements = {
+        mainPhoto: document.getElementById('mainPhoto'),
+        leftThumbnails: document.getElementById('leftThumbnails'),
+        rightThumbnails: document.getElementById('rightThumbnails'),
+        photoCounter: document.getElementById('photoCounter'),
+        prevBtn: document.getElementById('prevBtn'),
+        nextBtn: document.getElementById('nextBtn'),
+        uploadBtn: document.getElementById('uploadBtn'),
+        fileInput: document.getElementById('fileInput'),
+        uploadStatus: document.getElementById('uploadStatus')
+    };
 
-        // DOM elements
-        const elements = {
-            mainPhoto: document.getElementById('mainPhoto'),
-            leftThumbnails: document.getElementById('leftThumbnails'),
-            rightThumbnails: document.getElementById('rightThumbnails'),
-            photoCounter: document.getElementById('photoCounter'),
-            prevBtn: document.getElementById('prevBtn'),
-            nextBtn: document.getElementById('nextBtn'),
-            uploadBtn: document.getElementById('uploadBtn'),
-            fileInput: document.getElementById('fileInput'),
-            uploadStatus: document.getElementById('uploadStatus')
-        };
-
-        // Load photos from Firebase
-        function loadSharedPhotos() {
-            const galleryRef = ref(database, 'galleryImages');
-            
-            onValue(galleryRef, (snapshot) => {
-                const data = snapshot.val();
-                photos = data ? data : [];
-
-                
-        // If empty, initialize with defaults
-                if (photos.length === 0) {
-                    photos = [
-                        'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net%2Fth%2Fid%2FOIP.1kZ-xCeYDmfn13OJOxxxXgHaHa%3Fpid%3DApi&f=1&ipt=702144901e207e7486991c445f63bff8ac7808da4e36b7555c6237b86263add3&ipo=images',
-                        
-                    ];
-                    set(galleryRef, photos);
-                }
-                
-                initGallery();
-            });
-        }
+    // Load photos from Firebase
+    function loadSharedPhotos() {
+        const galleryRef = ref(database, 'galleryImages');
         
-        // Gallery functions
-        function initGallery() {
-            updateMainPhoto();
-            updateThumbnails();
-            updateCounter();
-        }
-        
-        function updateMainPhoto() {
-            if (photos.length === 0) {
-                elements.mainPhoto.src = '';
-                elements.mainPhoto.alt = 'No photos available';
-                return;
-            }
-            elements.mainPhoto.src = photos[currentIndex];
-            elements.mainPhoto.alt = `Photo ${currentIndex + 1}`;
-        }
-        
-        function getCircularIndex(index) {
-            return (index + photos.length) % photos.length;
-        }
-        
-        function updateThumbnails() {
-            elements.leftThumbnails.innerHTML = '';
-            elements.rightThumbnails.innerHTML = '';
-            
-            if (photos.length === 0) return;
-            
-            // Left thumbnails (previous photos)
-            for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
-                const index = getCircularIndex(currentIndex - i);
-                createThumbnail(index, elements.leftThumbnails);
-            }
-            
-            // Right thumbnails (next photos)
-            for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
-                const index = getCircularIndex(currentIndex + i);
-                createThumbnail(index, elements.rightThumbnails);
-            }
-        }
-        
-        function createThumbnail(index, container) {
-            const thumb = document.createElement('img');
-            thumb.src = photos[index];
-            thumb.className = 'thumbnail';
-            thumb.alt = `Photo ${index + 1}`;
-            thumb.addEventListener('click', () => {
-                currentIndex = index;
-                initGallery();
-            });
-            container.appendChild(thumb);
-        }
-        
-        function updateCounter() {
-            if (photos.length === 0) {
-                elements.photoCounter.textContent = 'No photos available';
-                return;
-            }
-            elements.photoCounter.textContent = `Photo ${currentIndex + 1} of ${photos.length}`;
-        }
-
-        // Upload functionality
-        elements.uploadBtn.addEventListener('click', () => {
-            elements.fileInput.click();
+        onValue(galleryRef, (snapshot) => {
+            const data = snapshot.val();
+            photos = Array.isArray(data) ? data.filter(url => typeof url === 'string' && url.startsWith('http')) : [];
+            initGallery();
+        }, (error) => {
+            console.error("Firebase read failed:", error);
+            elements.uploadStatus.textContent = 'Connection error';
         });
+    }
+
+    // Gallery functions
+    function initGallery() {
+        updateMainPhoto();
+        updateThumbnails();
+        updateCounter();
+    }
+    
+    function updateMainPhoto() {
+        if (photos.length === 0) {
+            elements.mainPhoto.src = '';
+            elements.mainPhoto.alt = 'No photos available';
+            return;
+        }
+        elements.mainPhoto.src = photos[currentIndex];
+        elements.mainPhoto.alt = `Photo ${currentIndex + 1}`;
+    }
+    
+    function getCircularIndex(index) {
+        return (index + photos.length) % photos.length;
+    }
+    
+    function updateThumbnails() {
+        elements.leftThumbnails.innerHTML = '';
+        elements.rightThumbnails.innerHTML = '';
         
-        elements.fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
-            elements.uploadBtn.disabled = true;
-            
-            try {
-                // 1. Upload to Cloudinary
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                
-                const uploadResponse = await fetch(
-                    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-                    { method: 'POST', body: formData }
-                );
-                
-                const uploadData = await uploadResponse.json();
-                
-                if (uploadData.secure_url) {
-                    // 2. Update Firebase
-                    elements.uploadStatus.textContent = 'Updating gallery...';
-                    
-                    // Add new image to beginning of array
-                    const updatedPhotos = [uploadData.secure_url, ...photos];
-                    await set(ref(database, 'galleryImages'), updatedPhotos);
-                    
-                    elements.uploadStatus.textContent = 'Upload complete!';
-                } else {
-                    throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
-                }
-            } catch (error) {
-                elements.uploadStatus.textContent = 'Error: ' + error.message;
-                console.error('Upload error:', error);
-            } finally {
-                elements.fileInput.value = '';
-                elements.uploadBtn.disabled = false;
-            }
-        });
+        if (photos.length === 0) return;
         
-        // Navigation controls
-        elements.prevBtn.addEventListener('click', () => {
-            if (photos.length === 0) return;
-            currentIndex = getCircularIndex(currentIndex - 1);
+        // Left thumbnails (previous photos)
+        for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
+            const index = getCircularIndex(currentIndex - i);
+            createThumbnail(index, elements.leftThumbnails);
+        }
+        
+        // Right thumbnails (next photos)
+        for (let i = 1; i <= Math.min(3, photos.length - 1); i++) {
+            const index = getCircularIndex(currentIndex + i);
+            createThumbnail(index, elements.rightThumbnails);
+        }
+    }
+    
+    function createThumbnail(index, container) {
+        const thumb = document.createElement('img');
+        thumb.src = photos[index];
+        thumb.className = 'thumbnail';
+        thumb.alt = `Photo ${index + 1}`;
+        thumb.addEventListener('click', () => {
+            currentIndex = index;
             initGallery();
         });
+        container.appendChild(thumb);
+    }
+    
+    function updateCounter() {
+        if (photos.length === 0) {
+            elements.photoCounter.textContent = 'No photos available';
+            return;
+        }
+        elements.photoCounter.textContent = `Photo ${currentIndex + 1} of ${photos.length}`;
+    }
+
+    // Upload functionality
+    elements.fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         
-        elements.nextBtn.addEventListener('click', () => {
-            if (photos.length === 0) return;
-            currentIndex = getCircularIndex(currentIndex + 1);
-            initGallery();
-        });
+        elements.uploadStatus.textContent = 'Uploading to Cloudinary...';
+        elements.uploadBtn.disabled = true;
         
-        // Keyboard and touch controls
-        document.addEventListener('keydown', (e) => {
-            if (photos.length === 0) return;
-            if (e.key === 'ArrowLeft') elements.prevBtn.click();
-            if (e.key === 'ArrowRight') elements.nextBtn.click();
-        });
-        
-        let touchStartX = 0;
-        document.addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-        });
-        
-        document.addEventListener('touchend', (e) => {
-            const touchEndX = e.changedTouches[0].screenX;
-            if (touchEndX < touchStartX - 50) elements.nextBtn.click();  // Swipe left
-            if (touchEndX > touchStartX + 50) elements.prevBtn.click(); // Swipe right
-        });
-        
-        // Initial load
-        loadSharedPhotos();
-    </script>
+        try {
+            // 1. Upload to Cloudinary
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            
+            const uploadResponse = await fetch(
+                `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+                { method: 'POST', body: formData }
+            );
+            
+            const uploadData = await uploadResponse.json();
+            
+            if (uploadData.secure_url) {
+                // 2. Update Firebase
+                elements.uploadStatus.textContent = 'Updating gallery...';
+                const updatedPhotos = [uploadData.secure_url, ...photos];
+                await set(ref(database, 'galleryImages'), updatedPhotos);
+                
+                elements.uploadStatus.textContent = 'Upload complete!';
+            } else {
+                throw new Error(uploadData.error?.message || 'Cloudinary upload failed');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            elements.uploadStatus.textContent = 'Error: ' + error.message;
+        } finally {
+            elements.fileInput.value = '';
+            elements.uploadBtn.disabled = false;
+        }
+    });
+    
+    // Navigation controls
+    elements.prevBtn.addEventListener('click', () => {
+        if (photos.length === 0) return;
+        currentIndex = getCircularIndex(currentIndex - 1);
+        initGallery();
+    });
+    
+    elements.nextBtn.addEventListener('click', () => {
+        if (photos.length === 0) return;
+        currentIndex = getCircularIndex(currentIndex + 1);
+        initGallery();
+    });
+    
+    // Keyboard and touch controls
+    document.addEventListener('keydown', (e) => {
+        if (photos.length === 0) return;
+        if (e.key === 'ArrowLeft') elements.prevBtn.click();
+        if (e.key === 'ArrowRight') elements.nextBtn.click();
+    });
+    
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    });
+    
+    document.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].screenX;
+        if (touchEndX < touchStartX - 50) elements.nextBtn.click();
+        if (touchEndX > touchStartX + 50) elements.prevBtn.click();
+    });
+    
+    // Initial load
+    loadSharedPhotos();
+</script>
 </body>
 </html>
