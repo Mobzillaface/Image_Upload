@@ -225,7 +225,88 @@
             text-align: center;
             max-width: 400px;
         }
-        
+
+        /* Authentication modal styles */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .auth-container {
+            background-color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .auth-title {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background-color: #222;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .auth-submit {
+            width: 100%;
+            padding: 12px;
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .auth-submit:hover {
+            background-color: #1b5e20;
+        }
+
+        .auth-error {
+            color: #ff4444;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .auth-success {
+            color: #00C851;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .auth-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 flex-direction: column;
@@ -261,6 +342,18 @@
 </head>
 <body>
     <h1>Test Photo Gallery</h1>
+    
+    <!-- Authentication Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-container">
+            <span class="auth-close" id="authClose">&times;</span>
+            <h2 class="auth-title">Authentication Required</h2>
+            <p style="color: #aaa; text-align: center; margin-bottom: 20px;">I gave you a key, put it here</p>
+            <input type="password" id="apiKeyInput" class="auth-input" placeholder="Enter your API key">
+            <button id="authSubmit" class="auth-submit">Authenticate</button>
+            <div id="authMessage" class="auth-error"></div>
+        </div>
+    </div>
     
     <div class="gallery-container">
         <div class="main-content">
@@ -309,9 +402,15 @@
     const CLOUDINARY_CLOUD_NAME = 'dadjewcmh';
     const CLOUDINARY_UPLOAD_PRESET = 'Test1234';
     
+    // Valid API keys (in a real app, these would be stored securely and verified server-side)
+    const VALID_API_KEYS = [
+        "test"
+    ];
+    
     let photos = [];
     let currentIndex = 0;
     let elements;
+    let isAuthenticated = false;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Initialize DOM elements
@@ -324,7 +423,12 @@
             nextBtn: document.getElementById('nextBtn'),
             uploadBtn: document.getElementById('uploadBtn'),
             fileInput: document.getElementById('fileInput'),
-            uploadStatus: document.getElementById('uploadStatus')
+            uploadStatus: document.getElementById('uploadStatus'),
+            authModal: document.getElementById('authModal'),
+            apiKeyInput: document.getElementById('apiKeyInput'),
+            authSubmit: document.getElementById('authSubmit'),
+            authMessage: document.getElementById('authMessage'),
+            authClose: document.getElementById('authClose')
         };
 
         // Set up event listeners
@@ -335,7 +439,13 @@
     });
 
     function setupEventListeners() {
-        elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
+        elements.uploadBtn.addEventListener('click', () => {
+            if (isAuthenticated) {
+                elements.fileInput.click();
+            } else {
+                showAuthModal();
+            }
+        });
         
         elements.fileInput.addEventListener('change', handleFileUpload);
         
@@ -350,6 +460,63 @@
             currentIndex = (currentIndex + 1) % photos.length;
             updateGallery();
         });
+
+        // Authentication modal events
+        elements.authSubmit.addEventListener('click', handleAuthentication);
+        elements.authClose.addEventListener('click', hideAuthModal);
+        elements.apiKeyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleAuthentication();
+            }
+        });
+    }
+
+    function showAuthModal() {
+        elements.authModal.style.display = 'flex';
+        elements.apiKeyInput.focus();
+    }
+
+    function hideAuthModal() {
+        elements.authModal.style.display = 'none';
+        elements.authMessage.textContent = '';
+        elements.apiKeyInput.value = '';
+    }
+
+    function handleAuthentication() {
+        const apiKey = elements.apiKeyInput.value.trim();
+        
+        if (!apiKey) {
+            elements.authMessage.textContent = 'Please enter an API key';
+            elements.authMessage.className = 'auth-error';
+            return;
+        }
+        
+        // In a real application, you would verify the key with a server-side check
+        if (VALID_API_KEYS.includes(apiKey)) {
+            isAuthenticated = true;
+            elements.authMessage.textContent = 'Authentication successful!';
+            elements.authMessage.className = 'auth-success';
+            
+            // Hide modal after 1 second
+            setTimeout(() => {
+                hideAuthModal();
+                // Now that we're authenticated, trigger the file input click
+                elements.fileInput.click();
+            }, 1000);
+            
+            // Store authentication in sessionStorage
+            sessionStorage.setItem('galleryAuth', 'true');
+        } else {
+            elements.authMessage.textContent = 'Invalid API key';
+            elements.authMessage.className = 'auth-error';
+        }
+    }
+
+    function checkSessionAuth() {
+        const authStatus = sessionStorage.getItem('galleryAuth');
+        if (authStatus === 'true') {
+            isAuthenticated = true;
+        }
     }
 
     function loadSharedPhotos() {
@@ -371,6 +538,15 @@
     }
 
     async function handleFileUpload(e) {
+        // Check authentication again in case session was cleared
+        checkSessionAuth();
+        
+        if (!isAuthenticated) {
+            showAuthModal();
+            elements.fileInput.value = ''; // Clear the file input
+            return;
+        }
+
         const file = e.target.files[0];
         if (!file) return;
         
@@ -470,6 +646,15 @@
 
     // Upload functionality
     elements.fileInput.addEventListener('change', async (e) => {
+        // Check authentication
+        checkSessionAuth();
+        
+        if (!isAuthenticated) {
+            showAuthModal();
+            elements.fileInput.value = ''; // Clear the file input
+            return;
+        }
+
         const file = e.target.files[0];
         if (!file) return;
         
@@ -541,6 +726,7 @@
     
     // Initial load
     loadSharedPhotos();
+    checkSessionAuth(); // Check if user was previously authenticated
 </script>
 </body>
 </html>
